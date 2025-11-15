@@ -1,0 +1,21 @@
+# Python caches and virtual environments
+__pycache__/
+*.py[cod]
+venv/
+.env
+dev_env/
+
+# Dataset and generated assets
+Dataset/
+dataset/
+ptd/
+ptd_dataset/
+outputs/
+artifacts/
+checkpoints/
+logs/
+
+# IDE settings and local configs
+.vscode/
+.idea/
+.DS_Store

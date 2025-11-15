@@ -1,0 +1,6 @@
+name: classical-baseline
+variant: classical
+dataset_root: ./ptd/images
+manifest_path: ./ptd/metafile.txt
+class_map_path: ./ptd/classes.txt
+class_count: 56
