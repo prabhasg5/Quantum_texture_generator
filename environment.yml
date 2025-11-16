@@ -24,3 +24,4 @@ dependencies:
       - tensorboard>=2.15
       - click>=8.1
       - rich>=13.7
+      - tqdm>=4.66

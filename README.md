@@ -50,6 +50,22 @@ A hybrid quantum-classical pipeline that produces 32×32 texture tiles with genu
 	python -m src.training.dry_run --config configs/quantum.yaml
 	```
 
+## Running Training
+- Quantum variant:
+	```bash
+	python -m src.training.run --config configs/quantum.yaml
+	```
+- Classical baseline:
+	```bash
+	python -m src.training.run --config configs/classical.yaml
+	```
+
+Training displays tqdm progress bars per epoch with live discriminator/generator losses. Every five epochs the loop:
+- Writes generator samples to `outputs/<variant>/samples/epoch_XXX.png`.
+- Updates `outputs/<variant>/loss_history.pkl` and plots `outputs/<variant>/plots/loss_curve_epoch_XXX.png`.
+
+Checkpoints and logs remain under `outputs/<variant>/`. With `device: auto`, PyTorch chooses MPS/GPU/CPU automatically, and with `resume: true` the latest checkpoint is restored after any interruption.
+
 ## Parallel Training Workflow
 1. **Prep main:** `git checkout main && git pull` on both machines.
 2. **Quantum branch (you):**

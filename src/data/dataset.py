@@ -2,9 +2,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from pathlib import Path
-from typing import Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 import torch
 from torch.utils.data import Dataset
@@ -12,17 +11,6 @@ from torchvision.io import read_image
 
 from ..utils.colors import extract_palette
 from ..utils.palette import PaletteEncoding, SimplePaletteStats
-
-
-@dataclass
-class TextureSample:
-    """Container describing a single texture example and its metadata."""
-
-    image: torch.Tensor
-    class_id: int
-    palette_embedding: torch.Tensor
-    palette_colors: torch.Tensor
-    path: Path
 
 
 class PTDTextureDataset(Dataset):
@@ -54,7 +42,7 @@ class PTDTextureDataset(Dataset):
     def __len__(self) -> int:
         return len(self.records)
 
-    def __getitem__(self, index: int) -> TextureSample:
+    def __getitem__(self, index: int) -> Dict[str, Any]:
         record = self.records[index]
         image = self._load_image(record["path"])
         if self.transform:
@@ -62,14 +50,16 @@ class PTDTextureDataset(Dataset):
 
         palette_colors = self._derive_palette(image)
         palette_embedding = self.palette_encoder.encode(palette_colors)
+        palette_embedding = palette_embedding.to(image.dtype)
+        palette_colors = palette_colors.to(image.dtype)
 
-        return TextureSample(
-            image=image,
-            class_id=record["class_id"],
-            palette_embedding=palette_embedding,
-            palette_colors=palette_colors,
-            path=record["path"],
-        )
+        return {
+            "image": image,
+            "class_id": torch.tensor(record["class_id"], dtype=torch.long),
+            "palette_embedding": palette_embedding,
+            "palette_colors": palette_colors,
+            "path": str(record["path"]),
+        }
 
     def _load_class_map(self, mapping_path: Optional[Path]) -> Dict[str, int]:
         if mapping_path:
@@ -110,10 +100,12 @@ class PTDTextureDataset(Dataset):
 
     def _load_image(self, path: Path) -> torch.Tensor:
         tensor = read_image(str(path)).float() / 255.0
+        tensor = tensor * 2.0 - 1.0
         if tensor.shape[0] == 1:
             tensor = tensor.repeat(3, 1, 1)
         return tensor
 
     def _derive_palette(self, image: torch.Tensor) -> torch.Tensor:
-        palette = extract_palette(image, n_colors=self.palette_size)
+        rgb = (image + 1.0) / 2.0
+        palette = extract_palette(rgb, n_colors=self.palette_size)
         return palette

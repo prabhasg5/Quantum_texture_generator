@@ -32,12 +32,14 @@ class TextureDecoder(nn.Module):
             ResidualBlock(base_channels),
             ResidualBlock(base_channels // 2),
             ResidualBlock(base_channels // 4),
+            ResidualBlock(base_channels // 8),
         ])
         self.upsample = nn.ModuleList([
             nn.ConvTranspose2d(base_channels, base_channels // 2, kernel_size=4, stride=2, padding=1),
             nn.ConvTranspose2d(base_channels // 2, base_channels // 4, kernel_size=4, stride=2, padding=1),
+            nn.ConvTranspose2d(base_channels // 4, base_channels // 8, kernel_size=4, stride=2, padding=1),
         ])
-        self.output = nn.Conv2d(base_channels // 4, 3, kernel_size=3, padding=1)
+        self.output = nn.Conv2d(base_channels // 8, 3, kernel_size=3, padding=1)
 
     def forward(self, latent: torch.Tensor) -> torch.Tensor:  # type: ignore[override]
         batch = latent.shape[0]
@@ -48,5 +50,7 @@ class TextureDecoder(nn.Module):
         x = self.blocks[1](x)
         x = self.upsample[1](x)
         x = self.blocks[2](x)
+        x = self.upsample[2](x)
+        x = self.blocks[3](x)
         x = torch.tanh(self.output(x))
         return x
