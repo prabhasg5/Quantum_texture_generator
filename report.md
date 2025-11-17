@@ -31,27 +31,20 @@ Quantum Canvas emerges from these needs: a controllable generator that explores 
 
 ## 1.3 Problem Statement
 
-Design a controllable, quantum‑augmented texture generator that:
-- Accepts a user‑selected texture class (mapped to dataset subfolders) and generates diverse, high‑quality textures for ideation.
-- Encourages novelty (avoids mimicry of the nearest training example) while preserving texture identity and usability in fashion contexts.
-- Trains efficiently on a MacBook Air with 16 GB RAM; supports safe interruption and resumption without losing significant progress.
-- Produces audit‑friendly outputs: per‑class sample grids, loss curves, LPIPS distributions, FID, and coverage plots.
+Fashion designers constantly need fresh, original patterns to spark new garment ideas, yet most available tools—classical GANs, diffusion models, and online inspiration sources—recycle variations of existing textures. Daily practice often devolves into scrolling thousands of reference images, reusing familiar motifs, or relying on narrow mood boards that lack novelty. Classical generative models amplify this issue because they are optimized to mimic training distributions rather than to expand creative possibility; the result is predictable, repetitive, and “safe” outputs. This constrains creative range, slows ideation, and risks collections feeling derivative instead of innovative. The need is for a system that actively broadens texture space—producing fresh, unexpected patterns that can drive new design directions—while retaining controllable links to established texture families.
 
-Operational constraints and requirements:
-- Data curation: Exclude non‑texture images and flat‑color blocks to stabilize training and ensure outputs remain relevant.
-- Architecture: Conditional hybrid QGAN with a compact PQC block that stays on CPU; data and model use MPS/CPU as available.
-- Training UX: 
-  - Batch‑level progress bars.
-  - Checkpoint every 2 epochs and on interrupt; auto‑resume from latest.
-- Evaluation and Reporting:
-  - Save loss history and curves (discriminator vs. generator).
-  - Generate per‑class grids during training and at completion.
-  - Compute LPIPS‑nearest novelty, FID, and feature coverage; export metrics JSON and plots.
+### 1.3.1 Objectives
 
-Success criteria:
-- Visual: Designers report sufficient variety within each class and perceive outputs as “inspired by” rather than “copied from” the training data.
-- Quantitative: Balanced LPIPS (not too low), competitive FID (not overly degraded by novelty), and robust coverage.
-- Practical: End‑to‑end run is feasible on the target machine and easy to resume.
+1. Create a system that makes fresh, varied texture designs from chosen style and color ideas with Quantum GAN.
+2. Add simple metrics to check how new, varied, and quality the textures are.
+3. Provide an easy web page where designers pick ideas and get texture sets.
+
+### 1.3.2 Outcomes
+
+1. Texture sets generated with richer latent space.
+2. Numbers and charts show the system gives broader variety without losing quality.
+3. The web page where fashion designers quickly build moodboard‑ready texture packs.
+
 
 ## 1.4 Applications
 
@@ -61,3 +54,10 @@ Success criteria:
 - Mood Boards and Lookbooks: Populate boards with coherent yet varied textures across chosen style families.
 - Iterative Co‑Creation: Designers steer by class selection and curation; Quantum Canvas supplies diverse candidates for refinement.
 - Supplier Briefing: Share curated grids with print vendors as reference directions, accelerating sample turnaround.
+
+## 1.5 Societal Applications (Short Version)
+
+1. Creative empowerment: Offers an ongoing stream of original textures to help designers break creative blocks and speed up idea development.
+2. Sustainable development: Cuts reliance on physical fabric sampling, reducing material waste, dyes usage, and environmental impact.
+3. Democratized access: Brings advanced pattern generation to students and small studios without costly software licenses.
+4. Quantum awareness: Demonstrates a practical, everyday creative use case for emerging quantum technology.
