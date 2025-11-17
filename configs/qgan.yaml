@@ -1,0 +1,32 @@
+dataset:
+  root: dataset
+  image_size: 128
+  batch_size: 24
+  num_workers: 8
+  persistent_workers: true
+  pin_memory: true
+
+model:
+  latent_dim: 96
+  image_channels: 3
+  base_channels: 64
+  quantum_wires: 6
+  quantum_layers: 2
+  class_emb_dim: 64
+
+training:
+  epochs: 60
+  lr: 0.0002
+  beta1: 0.5
+  beta2: 0.999
+  samples_per_class: 6
+  checkpoint_every: 5
+  log_dir: runs/qgan_fashion
+  reports_dir: reports/qgan_fashion
+  novelty_lambda: 0.05
+  device: auto
+  fid_samples: 512
+  lpips_samples: 128
+  lpips_ref: 256
+  coverage_samples: 256
+  coverage_k: 5

@@ -1,21 +1,28 @@
-# Python caches and virtual environments
+# Bytecode / cache
 __pycache__/
 *.py[cod]
+*.so
+
+# Virtual environments
+.venv/
 venv/
-.env
-dev_env/
 
 # Dataset and generated assets
-Dataset/
 dataset/
-ptd/
-ptd_dataset/
-outputs/
-artifacts/
-checkpoints/
+dataset_cleaned/
+runs/
+reports/
+generated/
+generated_samples.png
+
+# Checkpoints / logs
+*.pt
+*.pth
+*.ckpt
 logs/
 
-# IDE settings and local configs
-.vscode/
-.idea/
+# Miscellaneous
 .DS_Store
+*.log
+.ipynb_checkpoints/
+
