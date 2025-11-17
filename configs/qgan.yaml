@@ -23,6 +23,7 @@ training:
   beta2: 0.999
   samples_per_class: 6
   checkpoint_every: 2
+  report_every: 1
   log_dir: runs/qgan_fashion
   reports_dir: reports/qgan_fashion
   novelty_lambda: 0.05

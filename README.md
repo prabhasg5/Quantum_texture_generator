@@ -32,7 +32,9 @@ python -m src.training.train_qgan --config configs/qgan.yaml
 Artifacts:
 
 - `runs/qgan_fashion/` – checkpoints (`checkpoint_epoch_*.pt`) plus per-epoch class grids.
-- `reports/qgan_fashion/` – final class grid, loss curves, LPIPS histogram, feature coverage plot, `metrics.json` (FID, LPIPS novelty, feature coverage).
+- `reports/qgan_fashion/` – latest class grid, loss curves, LPIPS histogram, feature coverage plot, `metrics.json` (FID, LPIPS novelty, feature coverage).
+- `reports/qgan_fashion/loss_history.pkl` – pickled `{"generator": [...], "discriminator": [...]}` arrays updated every reporting pass.
+- `reports/qgan_fashion/epochs/epoch_XXXX/` – frozen snapshots of each epoch’s `loss_curve.png`, `metrics.json`, `lpips_hist.png`, and `feature_coverage.png` so you can audit training progress step-by-step.
 
 ### 4. Generate Inspiration Textures on Demand
 
@@ -51,13 +53,13 @@ Omit `--class-name` to create a grid covering every class (useful for design rev
 
 ### 5. Metrics & Visual Reporting
 
-During `trainer.fit()` the following are computed automatically after training:
+During `trainer.fit()` the following are computed automatically every `report_every` epochs (defaults to 1, so once per epoch) and stored both as running “latest” files and immutable `reports/.../epochs/epoch_XXXX/` snapshots:
 
 - **FID** (torchmetrics) – realism vs. training distribution.
 - **LPIPS-to-nearest-train** – novelty; the histogram shows how far generations drift from their closest reference texture.
 - **Feature-space coverage** – EfficientNet feature radii vs. generator reach, plotted with coverage percentage.
 
-All plots live inside `reports/qgan_fashion/` and are regenerated whenever you re-run training.
+All plots live inside `reports/qgan_fashion/`, with time-stamped copies in `reports/qgan_fashion/epochs/*`. Adjust `training.report_every` in `configs/qgan.yaml` if you want to thin out expensive metric passes.
 
 ### 6. Notes on Quantum Creativity
 

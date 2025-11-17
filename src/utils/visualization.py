@@ -35,6 +35,7 @@ def save_class_grid(
     latent_dim: int,
     out_path: Path,
 ) -> None:
+    was_training = generator.training
     generator.eval()
     rows = []
     with torch.no_grad():
@@ -47,6 +48,7 @@ def save_class_grid(
     stacked = torch.cat(rows, dim=1)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     save_image(stacked, out_path)
+    generator.train(was_training)
 
 
 def save_lpips_hist(values: Sequence[float], out_path: Path) -> None:

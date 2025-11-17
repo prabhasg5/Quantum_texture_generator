@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 import argparse
+import pickle
+import shutil
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict
@@ -31,6 +33,7 @@ class TrainingConfig:
     latent_dim: int = 96
     samples_per_class: int = 6
     checkpoint_every: int = 2
+    report_every: int = 1
     log_dir: Path = Path("runs/qgan")
     reports_dir: Path = Path("reports/qgan")
     novelty_lambda: float = 0.05
@@ -70,6 +73,7 @@ class Trainer:
         self.opt_D = optim.Adam(self.discriminator.parameters(), lr=train_cfg.lr, betas=(train_cfg.beta1, train_cfg.beta2))
 
         self.loss_history: Dict[str, list] = {"discriminator": [], "generator": []}
+        self.metric_history: list[Dict[str, float]] = []
         self.global_step = 0
         self.start_epoch = 1
         self.current_epoch = self.start_epoch - 1
@@ -78,6 +82,9 @@ class Trainer:
         self.reports_dir = Path(train_cfg.reports_dir)
         self.log_dir.mkdir(parents=True, exist_ok=True)
         self.reports_dir.mkdir(parents=True, exist_ok=True)
+        self.epoch_reports_dir = self.reports_dir / "epochs"
+        self.epoch_reports_dir.mkdir(parents=True, exist_ok=True)
+        self.loss_history_path = self.reports_dir / "loss_history.pkl"
 
         if self.train_cfg.resume_from:
             self._resume_if_possible(self.train_cfg.resume_from)
@@ -170,6 +177,8 @@ class Trainer:
                 if epoch % self.train_cfg.checkpoint_every == 0:
                     self._save_checkpoint(epoch)
                     self._log_samples(epoch)
+                if epoch % self.train_cfg.report_every == 0 or epoch == self.train_cfg.epochs:
+                    self._log_epoch_artifacts(epoch)
 
             # Final artifacts
             self._save_checkpoint(self.train_cfg.epochs)
@@ -178,6 +187,9 @@ class Trainer:
         except KeyboardInterrupt:
             print("\n[Trainer] Interrupt received. Saving latest checkpoint before exit...")
             self._save_checkpoint(self.current_epoch, tag="interrupt")
+            last_logged = self.metric_history[-1]["epoch"] if self.metric_history else 0
+            if self.current_epoch > last_logged:
+                self._log_epoch_artifacts(self.current_epoch)
             print(f"[Trainer] Saved checkpoint at epoch {self.current_epoch}. Resume later with --resume {self.log_dir / 'checkpoint_latest.pt'}")
 
     def _save_checkpoint(self, epoch: int, tag: str | None = None) -> None:
@@ -194,6 +206,7 @@ class Trainer:
             "epoch": epoch,
             "global_step": self.global_step,
             "loss_history": self.loss_history,
+            "metrics_history": self.metric_history,
         }
         filename = f"checkpoint_epoch_{epoch}.pt" if tag is None else f"checkpoint_{tag}.pt"
         path = self.log_dir / filename
@@ -213,6 +226,7 @@ class Trainer:
         if "opt_D" in data:
             self.opt_D.load_state_dict(data["opt_D"])
         self.loss_history = data.get("loss_history", self.loss_history)
+        self.metric_history = data.get("metrics_history", self.metric_history)
         self.global_step = data.get("global_step", self.global_step)
         last_epoch = data.get("epoch", 0)
         self.start_epoch = min(last_epoch + 1, self.train_cfg.epochs)
@@ -229,29 +243,44 @@ class Trainer:
             out_path=out_path,
         )
 
-    def _finalize_reports(self) -> None:
-        # Loss curves
-        plot_losses(self.loss_history, self.reports_dir / "loss_curve.png")
+    def _log_epoch_artifacts(self, epoch: int) -> None:
+        self._plot_loss_curves(epoch)
+        self._evaluate_and_log_metrics(epoch)
 
-        # Final per-class grid
-        save_class_grid(
-            self.generator,
-            [self.dataset.idx_to_class[i] for i in range(len(self.dataset.idx_to_class))],
-            self.device,
-            samples_per_class=self.train_cfg.samples_per_class,
-            latent_dim=self.model_cfg.latent_dim,
-            out_path=self.reports_dir / "class_grid.png",
-        )
+    def _plot_loss_curves(self, epoch: int) -> None:
+        epoch_dir = self.epoch_reports_dir / f"epoch_{epoch:04d}"
+        epoch_dir.mkdir(parents=True, exist_ok=True)
+        curve_path = self.reports_dir / "loss_curve.png"
+        plot_losses(self.loss_history, curve_path)
+        shutil.copyfile(curve_path, epoch_dir / "loss_curve.png")
+        self._persist_loss_history(epoch_dir)
 
-        # Metrics
-        fid = compute_fid(
-            self.generator,
-            self.eval_dataset,
-            self.device,
-            self.model_cfg.latent_dim,
-            batch_size=self.data_cfg.batch_size,
-            sample_count=self.train_cfg.fid_samples,
-        )
+    def _persist_loss_history(self, epoch_dir: Path) -> None:
+        with self.loss_history_path.open("wb") as f:
+            pickle.dump(self.loss_history, f)
+        shutil.copyfile(self.loss_history_path, epoch_dir / "loss_history.pkl")
+
+    def _evaluate_and_log_metrics(self, epoch: int) -> None:
+        epoch_dir = self.epoch_reports_dir / f"epoch_{epoch:04d}"
+        epoch_dir.mkdir(parents=True, exist_ok=True)
+        was_training = self.generator.training
+        self.generator.eval()
+        fid = None
+        try:
+            fid = compute_fid(
+                self.generator,
+                self.eval_dataset,
+                self.device,
+                self.model_cfg.latent_dim,
+                batch_size=self.data_cfg.batch_size,
+                sample_count=self.train_cfg.fid_samples,
+            )
+        except ModuleNotFoundError as exc:
+            print(
+                "[Metrics] Skipping FID:",
+                exc,
+                "→ Install torch-fidelity via 'pip install torchmetrics[image]' or 'pip install torch-fidelity' to enable.",
+            )
         lpips_avg, lpips_scores = compute_lpips_novelty(
             self.generator,
             self.eval_dataset,
@@ -269,17 +298,46 @@ class Trainer:
             k=self.train_cfg.coverage_k,
         )
 
+        lpips_hist_epoch = epoch_dir / "lpips_hist.png"
+        save_lpips_hist(lpips_scores, lpips_hist_epoch)
         save_lpips_hist(lpips_scores, self.reports_dir / "lpips_hist.png")
+
+        coverage_plot_epoch = epoch_dir / "feature_coverage.png"
+        plot_coverage(real_radius, fake_dists, coverage, coverage_plot_epoch)
         plot_coverage(real_radius, fake_dists, coverage, self.reports_dir / "feature_coverage.png")
 
-        save_metrics(
-            {
-                "fid": fid,
-                "lpips_nearest_train_avg": lpips_avg,
-                "feature_coverage": coverage,
-                "lpips_scores": lpips_scores,
-            },
-            self.reports_dir / "metrics.json",
+        detailed_metrics = {
+            "epoch": epoch,
+            "fid": float(fid) if fid is not None else None,
+            "lpips_nearest_train_avg": float(lpips_avg),
+            "feature_coverage": float(coverage),
+            "lpips_scores": [float(v) for v in lpips_scores],
+            "real_radius": [float(v) for v in real_radius],
+            "fake_distances": [float(v) for v in fake_dists],
+        }
+        save_metrics(detailed_metrics, epoch_dir / "metrics.json")
+        save_metrics(detailed_metrics, self.reports_dir / "metrics.json")
+
+        summary = {key: detailed_metrics[key] for key in ("epoch", "fid", "lpips_nearest_train_avg", "feature_coverage")}
+        self.metric_history.append(summary)
+        save_metrics({"history": self.metric_history}, self.reports_dir / "metrics_history.json")
+
+        self.generator.train(was_training)
+    def _finalize_reports(self) -> None:
+        if not self.metric_history:
+            self._log_epoch_artifacts(self.current_epoch)
+        else:
+            save_metrics({"history": self.metric_history}, self.reports_dir / "metrics_history.json")
+
+        self._plot_loss_curves(self.current_epoch)
+
+        save_class_grid(
+            self.generator,
+            [self.dataset.idx_to_class[i] for i in range(len(self.dataset.idx_to_class))],
+            self.device,
+            samples_per_class=self.train_cfg.samples_per_class,
+            latent_dim=self.model_cfg.latent_dim,
+            out_path=self.reports_dir / "class_grid.png",
         )
 
 
@@ -325,6 +383,7 @@ def build_from_yaml(cfg: Dict, resume_override: Path | None = None) -> Trainer:
         latent_dim=model_cfg.latent_dim,
         samples_per_class=training.get("samples_per_class", 6),
         checkpoint_every=training.get("checkpoint_every", 5),
+        report_every=training.get("report_every", 1),
         log_dir=Path(training.get("log_dir", "runs/qgan")),
         reports_dir=Path(training.get("reports_dir", "reports/qgan")),
         novelty_lambda=training.get("novelty_lambda", 0.05),
