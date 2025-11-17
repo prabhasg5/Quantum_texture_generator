@@ -1,17 +1,8 @@
 # ABSTRACT
 
-Fashion designers often struggle to quickly discover fresh textures and patterns that align with a collection’s concept, mood, and material constraints. Traditional reference hunting is time‑consuming, and many generative tools tend to either mimic training data too closely or explore a limited latent space, yielding repetitive outputs. Quantum Canvas addresses this gap with a hybrid quantum–classical generative approach (QGAN) focused on texture ideation for fashion design. The system ingests a curated texture dataset, filters non‑texture and flat‑color samples, and trains a conditional generator that produces per‑class textures on demand (e.g., “banded”, “bumpy”, etc.). The quantum component injects structured stochasticity and richer mixing into the latent space via parameterized quantum circuits (PQCs), aiming to improve novelty while maintaining perceptual quality.
+Fashion designers frequently face bottlenecks when sourcing distinctive textures and patterns that match a collection’s concept and material direction. Conventional reference hunting is slow, and many generative tools either overfit to exemplars or wander a narrow latent space, yielding repetitive outputs. Quantum Canvas proposes a hybrid quantum–classical generative framework (QGAN) for texture ideation: a curated dataset is cleaned to remove non‑textures and flat‑color blocks; a conditional generator is trained to produce textures by class (e.g., banded, bumpy), and a compact parameterized quantum circuit modulates the latent representation to encourage richer mixing and exploratory variation. The workflow is designed for local execution on consumer hardware, with class‑conditioned sampling, safe checkpointing and resumption, and a reporting pipeline that includes loss curves, per‑class grids, and quantitative lenses such as LPIPS‑nearest, FID, and feature‑space coverage. This document details the background, problem framing, methodology, and applications relevant to fashion design practice.
 
-Key contributions:
-- A practical dataset cleaning pipeline to exclude humans/objects/plain blocks and retain true textures.
-- A per‑class conditional hybrid QGAN architecture incorporating a compact PQC to enrich latent expressivity while remaining tractable on consumer hardware (MacBook Air, CPU/MPS).
-- A training workflow with safe checkpointing, resumability, and batch‑level progress visibility.
-- A post‑training evaluation suite combining novelty (LPIPS to nearest train), distributional fidelity (FID), and feature‑space coverage metrics, plus class‑wise sample grids for rapid visual review.
-
-Outcomes:
-- The system produces controllable, class‑conditioned textures that fashion teams can use as inspiration boards or starting points for print development.
-- Quantitative evaluation balances novelty and fidelity; qualitative grids enable art‑director review.
-- The workflow is designed for iterative creative use, emphasizing safety (resume, checkpoints) and reproducibility.
+Keywords: quantum generative models, conditional GAN, parameterized quantum circuits, texture synthesis, fashion design, dataset cleaning, LPIPS, FID, coverage
 
 # CHAPTER‑1 Introduction
 
