@@ -21,18 +21,20 @@ def weights_init(module: nn.Module) -> None:
 
 
 class QuantumStyleEncoder(nn.Module):
-    """Parameterized quantum circuit that maps latent noise to an entangled style vector."""
+    """Parameterized quantum circuit executed on CPU, independent of torch device."""
 
-    def __init__(self, input_dim: int, wires: int = 6, layers: int = 2) -> None:
+    def __init__(
+        self,
+        wires: int = 6,
+        layers: int = 2,
+        backend: str = "default.qubit",
+        torch_device: str = "cpu",
+    ) -> None:
         super().__init__()
         self.wires = wires
-        self.pre_net = nn.Sequential(
-            nn.Linear(input_dim, wires),
-            nn.LayerNorm(wires),
-            nn.Tanh(),
-        )
+        self.backend = backend
 
-        dev = qml.device("default.qubit", wires=wires)
+        dev = self._make_device(backend, wires, torch_device)
 
         @qml.qnode(dev, interface="torch", diff_method="backprop")
         def circuit(inputs, weights):
@@ -44,9 +46,28 @@ class QuantumStyleEncoder(nn.Module):
         self.quantum_layer = qml.qnn.TorchLayer(circuit, weight_shapes)
 
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
-        # Clamp to avoid exploding angles which destabilize simulation
-        scaled = self.pre_net(inputs)
-        return self.quantum_layer(scaled)
+        original_device = inputs.device
+        cpu_inputs = inputs.to(torch.device("cpu"))
+        outputs = self.quantum_layer(cpu_inputs)
+        return outputs.to(original_device)
+
+    def to(self, *args, **kwargs):  # noqa: D401
+        """Override .to() so the quantum layer always stays on CPU."""
+        super().to(torch.device("cpu"))
+        return self
+
+    @staticmethod
+    def _make_device(backend: str, wires: int, torch_device: str):
+        try:
+            if backend.endswith(".torch"):
+                return qml.device(backend, wires=wires, torch_device=torch_device)
+            return qml.device(backend, wires=wires)
+        except Exception as exc:  # pylint: disable=broad-except
+            fallback = "default.qubit"
+            print(
+                f"[QuantumStyleEncoder] Backend '{backend}' unavailable ({exc}). Falling back to '{fallback}'."
+            )
+            return qml.device(fallback, wires=wires)
 
 
 class HybridGenerator(nn.Module):
@@ -62,6 +83,8 @@ class HybridGenerator(nn.Module):
         quantum_layers: int = 2,
         class_emb_dim: int = 64,
         image_size: int = 128,
+        quantum_backend: str = "default.qubit.torch",
+        quantum_device: str = "cpu",
     ) -> None:
         super().__init__()
         self.latent_dim = latent_dim
@@ -71,8 +94,16 @@ class HybridGenerator(nn.Module):
 
         self.class_embed = nn.Embedding(num_classes, class_emb_dim)
         quantum_input_dim = latent_dim + class_emb_dim
+        self.quantum_proj = nn.Sequential(
+            nn.Linear(quantum_input_dim, quantum_wires),
+            nn.LayerNorm(quantum_wires),
+            nn.Tanh(),
+        )
         self.quantum_encoder = QuantumStyleEncoder(
-            quantum_input_dim, wires=quantum_wires, layers=quantum_layers
+            wires=quantum_wires,
+            layers=quantum_layers,
+            backend=quantum_backend,
+            torch_device=quantum_device,
         )
 
         fused_dim = latent_dim + class_emb_dim + quantum_wires
@@ -104,7 +135,8 @@ class HybridGenerator(nn.Module):
     def forward(self, noise: torch.Tensor, class_ids: torch.Tensor) -> torch.Tensor:
         class_emb = self.class_embed(class_ids)
         quantum_inputs = torch.cat([noise, class_emb], dim=1)
-        quantum_style = self.quantum_encoder(quantum_inputs)
+        quantum_angles = self.quantum_proj(quantum_inputs)
+        quantum_style = self.quantum_encoder(quantum_angles)
         fused = torch.cat([noise, class_emb, quantum_style], dim=1)
         x = self.fc(fused)
         x = x.view(x.shape[0], -1, self.feature_map_size, self.feature_map_size)
@@ -137,7 +169,8 @@ class ConditionalDiscriminator(nn.Module):
         class_map = self.class_embed(class_ids)
         class_map = class_map.unsqueeze(-1).unsqueeze(-1).expand_as(images)
         x = torch.cat([images, class_map], dim=1)
-        return self.model(x).view(-1)
+        logits = self.model(x)
+        return logits.view(images.size(0), -1).mean(dim=1)
 
 
 @dataclass
@@ -149,6 +182,8 @@ class ModelConfig:
     quantum_wires: int = 6
     quantum_layers: int = 2
     class_emb_dim: int = 64
+    quantum_backend: str = "default.qubit"
+    quantum_device: str = "cpu"
 
 
 def build_models(num_classes: int, cfg: ModelConfig) -> Tuple[HybridGenerator, ConditionalDiscriminator]:
@@ -161,6 +196,8 @@ def build_models(num_classes: int, cfg: ModelConfig) -> Tuple[HybridGenerator, C
         quantum_layers=cfg.quantum_layers,
         class_emb_dim=cfg.class_emb_dim,
         image_size=cfg.image_size,
+        quantum_backend=cfg.quantum_backend,
+        quantum_device=cfg.quantum_device,
     )
     discriminator = ConditionalDiscriminator(
         num_classes=num_classes,

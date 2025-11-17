@@ -8,6 +8,7 @@ from typing import Dict
 import torch
 from torch import nn, optim
 from torch.utils.data import DataLoader
+from tqdm import tqdm
 import yaml
 
 from src.data.texture_dataset import DataConfig, build_dataloader
@@ -29,7 +30,7 @@ class TrainingConfig:
     beta2: float = 0.999
     latent_dim: int = 96
     samples_per_class: int = 6
-    checkpoint_every: int = 5
+    checkpoint_every: int = 2
     log_dir: Path = Path("runs/qgan")
     reports_dir: Path = Path("reports/qgan")
     novelty_lambda: float = 0.05
@@ -71,6 +72,7 @@ class Trainer:
         self.loss_history: Dict[str, list] = {"discriminator": [], "generator": []}
         self.global_step = 0
         self.start_epoch = 1
+        self.current_epoch = self.start_epoch - 1
 
         self.log_dir = Path(train_cfg.log_dir)
         self.reports_dir = Path(train_cfg.reports_dir)
@@ -79,6 +81,10 @@ class Trainer:
 
         if self.train_cfg.resume_from:
             self._resume_if_possible(self.train_cfg.resume_from)
+        else:
+            latest = self.log_dir / "checkpoint_latest.pt"
+            if latest.exists():
+                self._resume_if_possible(latest)
 
     @staticmethod
     def _select_device(requested: str) -> torch.device:
@@ -125,7 +131,10 @@ class Trainer:
         diversity = 0.0
         if bsz > 1:
             flat = fake.view(bsz, -1)
-            diversity = torch.pdist(flat, p=2).mean()
+            try:
+                diversity = torch.pdist(flat, p=2).mean()
+            except NotImplementedError:
+                diversity = torch.pdist(flat.cpu(), p=2).mean().to(self.device)
         g_loss = adv_loss
         if isinstance(diversity, torch.Tensor):
             g_loss = g_loss - self.train_cfg.novelty_lambda * diversity
@@ -135,25 +144,43 @@ class Trainer:
         self.loss_history["discriminator"].append(d_loss.item())
         self.loss_history["generator"].append(g_loss.item())
         self.global_step += 1
-        return {"d_loss": d_loss.item(), "g_loss": g_loss.item(), "diversity": float(diversity) if isinstance(diversity, torch.Tensor) else 0.0}
+        diversity_scalar = diversity.detach().item() if isinstance(diversity, torch.Tensor) else float(diversity)
+        return {"d_loss": d_loss.item(), "g_loss": g_loss.item(), "diversity": diversity_scalar}
 
     def fit(self) -> None:
-        for epoch in range(self.start_epoch, self.train_cfg.epochs + 1):
-            for batch in self.loader:
-                metrics = self._train_step(batch)
-            print(
-                f"Epoch {epoch}/{self.train_cfg.epochs} | D: {metrics['d_loss']:.3f} | G: {metrics['g_loss']:.3f} | Diversity: {metrics['diversity']:.3f}"
-            )
-            if epoch % self.train_cfg.checkpoint_every == 0:
-                self._save_checkpoint(epoch)
-                self._log_samples(epoch)
+        try:
+            for epoch in range(self.start_epoch, self.train_cfg.epochs + 1):
+                self.current_epoch = epoch
+                progress = tqdm(
+                    self.loader,
+                    desc=f"Epoch {epoch}/{self.train_cfg.epochs}",
+                    leave=False,
+                    unit="batch",
+                )
+                for batch in progress:
+                    metrics = self._train_step(batch)
+                    progress.set_postfix(
+                        d=f"{metrics['d_loss']:.3f}",
+                        g=f"{metrics['g_loss']:.3f}",
+                        div=f"{metrics['diversity']:.1f}",
+                    )
+                print(
+                    f"Epoch {epoch}/{self.train_cfg.epochs} | D: {metrics['d_loss']:.3f} | G: {metrics['g_loss']:.3f} | Diversity: {metrics['diversity']:.3f}"
+                )
+                if epoch % self.train_cfg.checkpoint_every == 0:
+                    self._save_checkpoint(epoch)
+                    self._log_samples(epoch)
 
-        # Final artifacts
-        self._save_checkpoint(self.train_cfg.epochs)
-        self._log_samples(self.train_cfg.epochs)
-        self._finalize_reports()
+            # Final artifacts
+            self._save_checkpoint(self.train_cfg.epochs)
+            self._log_samples(self.train_cfg.epochs)
+            self._finalize_reports()
+        except KeyboardInterrupt:
+            print("\n[Trainer] Interrupt received. Saving latest checkpoint before exit...")
+            self._save_checkpoint(self.current_epoch, tag="interrupt")
+            print(f"[Trainer] Saved checkpoint at epoch {self.current_epoch}. Resume later with --resume {self.log_dir / 'checkpoint_latest.pt'}")
 
-    def _save_checkpoint(self, epoch: int) -> None:
+    def _save_checkpoint(self, epoch: int, tag: str | None = None) -> None:
         ckpt = {
             "generator": self.generator.state_dict(),
             "discriminator": self.discriminator.state_dict(),
@@ -168,15 +195,17 @@ class Trainer:
             "global_step": self.global_step,
             "loss_history": self.loss_history,
         }
-        path = self.log_dir / f"checkpoint_epoch_{epoch}.pt"
+        filename = f"checkpoint_epoch_{epoch}.pt" if tag is None else f"checkpoint_{tag}.pt"
+        path = self.log_dir / filename
         torch.save(ckpt, path)
+        torch.save(ckpt, self.log_dir / "checkpoint_latest.pt")
 
     def _resume_if_possible(self, checkpoint_path: Path) -> None:
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             print(f"[Resume] Checkpoint not found: {checkpoint_path}")
             return
-        data = torch.load(checkpoint_path, map_location=self.device)
+        data = torch.load(checkpoint_path, map_location=self.device, weights_only=False)
         self.generator.load_state_dict(data["generator"])
         self.discriminator.load_state_dict(data["discriminator"])
         if "opt_G" in data:
@@ -280,6 +309,8 @@ def build_from_yaml(cfg: Dict, resume_override: Path | None = None) -> Trainer:
         quantum_wires=model.get("quantum_wires", 6),
         quantum_layers=model.get("quantum_layers", 2),
         class_emb_dim=model.get("class_emb_dim", 64),
+        quantum_backend=model.get("quantum_backend", "default.qubit.torch"),
+        quantum_device=model.get("quantum_device", "cpu"),
     )
     resume_cfg = training.get("resume_from")
     resume_path = Path(resume_cfg) if resume_cfg else None

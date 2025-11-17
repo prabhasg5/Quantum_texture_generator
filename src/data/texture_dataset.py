@@ -98,8 +98,8 @@ def build_dataloader(cfg: DataConfig, augment: bool = True) -> Tuple[DataLoader,
         batch_size=cfg.batch_size,
         shuffle=augment,
         num_workers=cfg.num_workers,
-        persistent_workers=cfg.persistent_workers,
-        pin_memory=cfg.pin_memory,
+        persistent_workers=cfg.persistent_workers and cfg.num_workers > 0,
+        pin_memory=cfg.pin_memory and torch.cuda.is_available(),
         drop_last=augment,
     )
     return loader, dataset
