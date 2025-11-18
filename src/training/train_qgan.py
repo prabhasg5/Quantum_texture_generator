@@ -19,6 +19,7 @@ from src.training.metrics import (
     compute_fid,
     compute_feature_coverage,
     compute_lpips_novelty,
+    compute_colorfulness,
     save_metrics,
 )
 from src.utils.visualization import plot_losses, save_class_grid, save_lpips_hist, plot_coverage
@@ -28,6 +29,8 @@ from src.utils.visualization import plot_losses, save_class_grid, save_lpips_his
 class TrainingConfig:
     epochs: int = 50
     lr: float = 2e-4
+    lr_generator: float | None = None
+    lr_discriminator: float | None = None
     beta1: float = 0.5
     beta2: float = 0.999
     latent_dim: int = 96
@@ -37,6 +40,8 @@ class TrainingConfig:
     log_dir: Path = Path("runs/qgan")
     reports_dir: Path = Path("reports/qgan")
     novelty_lambda: float = 0.05
+    color_penalty_weight: float = 0.3
+    color_min_std: float = 0.12
     device: str = "auto"
     resume_from: Path | None = None
 
@@ -69,10 +74,12 @@ class Trainer:
         self.discriminator.to(self.device)
 
         self.criterion = nn.BCEWithLogitsLoss()
-        self.opt_G = optim.Adam(self.generator.parameters(), lr=train_cfg.lr, betas=(train_cfg.beta1, train_cfg.beta2))
-        self.opt_D = optim.Adam(self.discriminator.parameters(), lr=train_cfg.lr, betas=(train_cfg.beta1, train_cfg.beta2))
+        lr_g = train_cfg.lr_generator or train_cfg.lr
+        lr_d = train_cfg.lr_discriminator or train_cfg.lr
+        self.opt_G = optim.Adam(self.generator.parameters(), lr=lr_g, betas=(train_cfg.beta1, train_cfg.beta2))
+        self.opt_D = optim.Adam(self.discriminator.parameters(), lr=lr_d, betas=(train_cfg.beta1, train_cfg.beta2))
 
-        self.loss_history: Dict[str, list] = {"discriminator": [], "generator": []}
+        self.loss_history: Dict[str, list] = {"discriminator": [], "generator": [], "color_std": []}
         self.metric_history: list[Dict[str, float]] = []
         self.global_step = 0
         self.start_epoch = 1
@@ -142,17 +149,28 @@ class Trainer:
                 diversity = torch.pdist(flat, p=2).mean()
             except NotImplementedError:
                 diversity = torch.pdist(flat.cpu(), p=2).mean().to(self.device)
+        # Encourage channel variance to avoid grayscale collapse.
+        color_std = fake.view(bsz, fake.shape[1], -1).std(dim=2).mean(dim=1)
+        color_penalty = torch.relu(self.train_cfg.color_min_std - color_std).mean()
         g_loss = adv_loss
         if isinstance(diversity, torch.Tensor):
             g_loss = g_loss - self.train_cfg.novelty_lambda * diversity
+        if self.train_cfg.color_penalty_weight > 0:
+            g_loss = g_loss + self.train_cfg.color_penalty_weight * color_penalty
         g_loss.backward()
         self.opt_G.step()
 
         self.loss_history["discriminator"].append(d_loss.item())
         self.loss_history["generator"].append(g_loss.item())
+        self.loss_history["color_std"].append(color_std.mean().item())
         self.global_step += 1
         diversity_scalar = diversity.detach().item() if isinstance(diversity, torch.Tensor) else float(diversity)
-        return {"d_loss": d_loss.item(), "g_loss": g_loss.item(), "diversity": diversity_scalar}
+        return {
+            "d_loss": d_loss.item(),
+            "g_loss": g_loss.item(),
+            "diversity": diversity_scalar,
+            "color_std": color_std.mean().item(),
+        }
 
     def fit(self) -> None:
         try:
@@ -226,6 +244,8 @@ class Trainer:
         if "opt_D" in data:
             self.opt_D.load_state_dict(data["opt_D"])
         self.loss_history = data.get("loss_history", self.loss_history)
+        if "color_std" not in self.loss_history:
+            self.loss_history["color_std"] = []
         self.metric_history = data.get("metrics_history", self.metric_history)
         self.global_step = data.get("global_step", self.global_step)
         last_epoch = data.get("epoch", 0)
@@ -297,6 +317,13 @@ class Trainer:
             sample_count=self.train_cfg.coverage_samples,
             k=self.train_cfg.coverage_k,
         )
+        colorfulness = compute_colorfulness(
+            self.generator,
+            len(self.dataset.class_to_idx),
+            self.device,
+            self.model_cfg.latent_dim,
+            sample_count=self.train_cfg.lpips_samples,
+        )
 
         lpips_hist_epoch = epoch_dir / "lpips_hist.png"
         save_lpips_hist(lpips_scores, lpips_hist_epoch)
@@ -314,11 +341,15 @@ class Trainer:
             "lpips_scores": [float(v) for v in lpips_scores],
             "real_radius": [float(v) for v in real_radius],
             "fake_distances": [float(v) for v in fake_dists],
+            "colorfulness": colorfulness,
         }
         save_metrics(detailed_metrics, epoch_dir / "metrics.json")
         save_metrics(detailed_metrics, self.reports_dir / "metrics.json")
 
-        summary = {key: detailed_metrics[key] for key in ("epoch", "fid", "lpips_nearest_train_avg", "feature_coverage")}
+        summary = {
+            key: detailed_metrics[key]
+            for key in ("epoch", "fid", "lpips_nearest_train_avg", "feature_coverage", "colorfulness")
+        }
         self.metric_history.append(summary)
         save_metrics({"history": self.metric_history}, self.reports_dir / "metrics_history.json")
 
@@ -378,6 +409,8 @@ def build_from_yaml(cfg: Dict, resume_override: Path | None = None) -> Trainer:
     train_cfg = TrainingConfig(
         epochs=training.get("epochs", 50),
         lr=training.get("lr", 2e-4),
+        lr_generator=training.get("lr_generator"),
+        lr_discriminator=training.get("lr_discriminator"),
         beta1=training.get("beta1", 0.5),
         beta2=training.get("beta2", 0.999),
         latent_dim=model_cfg.latent_dim,
@@ -387,6 +420,8 @@ def build_from_yaml(cfg: Dict, resume_override: Path | None = None) -> Trainer:
         log_dir=Path(training.get("log_dir", "runs/qgan")),
         reports_dir=Path(training.get("reports_dir", "reports/qgan")),
         novelty_lambda=training.get("novelty_lambda", 0.05),
+        color_penalty_weight=training.get("color_penalty_weight", 0.3),
+        color_min_std=training.get("color_min_std", 0.12),
         device=training.get("device", "auto"),
         resume_from=resume_path,
         fid_samples=training.get("fid_samples", 512),

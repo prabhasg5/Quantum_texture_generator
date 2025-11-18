@@ -19,6 +19,8 @@ model:
 training:
   epochs: 60
   lr: 0.0002
+  lr_generator: 0.0002
+  lr_discriminator: 0.00015
   beta1: 0.5
   beta2: 0.999
   samples_per_class: 6
@@ -26,7 +28,9 @@ training:
   report_every: 1
   log_dir: runs/qgan_fashion
   reports_dir: reports/qgan_fashion
-  novelty_lambda: 0.05
+  novelty_lambda: 0.02
+  color_penalty_weight: 0.4
+  color_min_std: 0.15
   device: auto
   fid_samples: 512
   lpips_samples: 128

@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mood Board Canvas - Quantum Canvas</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/canvas.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2 class="logo">Quantum Canvas</h2>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-nav" onclick="window.location.href='/dashboard'">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                    </svg>
+                    Dashboard
+                </button>
+                <span class="user-name">{{ user.name }}</span>
+                <button class="btn-signout" onclick="signOut()">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Toolbar -->
+    <div class="toolbar">
+        <div class="toolbar-section">
+            <button class="tool-btn" id="upload-btn" title="Upload Image">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="17 8 12 3 7 8"></polyline>
+                    <line x1="12" y1="3" x2="12" y2="15"></line>
+                </svg>
+                Upload
+            </button>
+            <input type="file" id="file-input" accept="image/*" multiple style="display: none;">
+            
+            <button class="tool-btn" id="text-btn" title="Add Text">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="4 7 4 4 20 4 20 7"></polyline>
+                    <line x1="9" y1="20" x2="15" y2="20"></line>
+                    <line x1="12" y1="4" x2="12" y2="20"></line>
+                </svg>
+                Text
+            </button>
+            
+            <button class="tool-btn" id="note-btn" title="Add Sticky Note">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                    <polyline points="14 2 14 8 20 8"></polyline>
+                </svg>
+                Note
+            </button>
+            
+            <button class="tool-btn" id="color-picker-btn" title="Add Color Swatch">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="13.5" cy="6.5" r=".5"></circle>
+                    <circle cx="17.5" cy="10.5" r=".5"></circle>
+                    <circle cx="8.5" cy="7.5" r=".5"></circle>
+                    <circle cx="6.5" cy="12.5" r=".5"></circle>
+                    <path d="M12 2C6.5 2 2 6.5 2 12s4.5 10 10 10c.926 0 1.648-.746 1.648-1.688 0-.437-.18-.835-.437-1.125-.29-.289-.438-.652-.438-1.125a1.64 1.64 0 0 1 1.668-1.668h1.996c3.051 0 5.555-2.503 5.555-5.554C21.965 6.012 17.461 2 12 2z"></path>
+                </svg>
+                Color
+            </button>
+            
+            <div class="divider"></div>
+            
+            <button class="tool-btn" id="clear-selection-btn" title="Clear Selection">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"></circle>
+                    <line x1="15" y1="9" x2="9" y2="15"></line>
+                    <line x1="9" y1="9" x2="15" y2="15"></line>
+                </svg>
+            </button>
+            
+            <button class="tool-btn danger" id="delete-btn" title="Delete Selected">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <polyline points="3 6 5 6 21 6"></polyline>
+                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                </svg>
+            </button>
+        </div>
+        
+        <div class="toolbar-section">
+            <button class="tool-btn" id="save-canvas-btn" title="Save Canvas">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
+                    <polyline points="17 21 17 13 7 13 7 21"></polyline>
+                    <polyline points="7 3 7 8 15 8"></polyline>
+                </svg>
+                Save
+            </button>
+            
+            <button class="tool-btn" id="export-btn" title="Export as Image">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                    <polyline points="7 10 12 15 17 10"></polyline>
+                    <line x1="12" y1="15" x2="12" y2="3"></line>
+                </svg>
+                Export
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Canvas Area -->
+    <div class="canvas-wrapper">
+        <div class="canvas-container" id="canvas">
+            <div class="grid-background"></div>
+            <!-- Canvas items will be added here dynamically -->
+        </div>
+    </div>
+
+    <!-- Sidebar for recent generations -->
+    <aside class="sidebar" id="sidebar">
+        <button class="sidebar-toggle" id="sidebar-toggle">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <polyline points="15 18 9 12 15 6"></polyline>
+            </svg>
+        </button>
+        
+        <div class="sidebar-content">
+            <h3>Recent Generations</h3>
+            <div id="recent-generations" class="generation-list">
+                <div class="loading">Loading...</div>
+            </div>
+        </div>
+    </aside>
+
+    <!-- Color Picker Modal -->
+    <div class="modal" id="color-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Color Swatch</h3>
+                <button class="modal-close" onclick="closeColorModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="color" id="color-input" value="#00f5ff">
+                <input type="text" id="color-hex-input" placeholder="#00f5ff" maxlength="7">
+                <button class="btn-primary" onclick="addColorSwatch()">Add to Canvas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Text Input Modal -->
+    <div class="modal" id="text-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Text</h3>
+                <button class="modal-close" onclick="closeTextModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <input type="text" id="text-input" placeholder="Enter text..." maxlength="100">
+                <label>Font Size</label>
+                <input type="range" id="text-size" min="12" max="72" value="24">
+                <span id="text-size-value">24px</span>
+                <button class="btn-primary" onclick="addTextToCanvas()">Add to Canvas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Note Input Modal -->
+    <div class="modal" id="note-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Add Sticky Note</h3>
+                <button class="modal-close" onclick="closeNoteModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <textarea id="note-input" placeholder="Write your note..." rows="4" maxlength="200"></textarea>
+                <div class="note-colors">
+                    <div class="note-color" data-color="#fff740" style="background: #fff740;"></div>
+                    <div class="note-color" data-color="#ff6eb4" style="background: #ff6eb4;"></div>
+                    <div class="note-color" data-color="#00f5ff" style="background: #00f5ff;"></div>
+                    <div class="note-color" data-color="#b4ff9f" style="background: #b4ff9f;"></div>
+                    <div class="note-color selected" data-color="#ffd4a3" style="background: #ffd4a3;"></div>
+                </div>
+                <button class="btn-primary" onclick="addNoteToCanvas()">Add to Canvas</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Add html2canvas library for canvas export -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="{{ url_for('static', filename='js/canvas.js') }}"></script>
+</body>
+</html>

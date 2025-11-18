@@ -35,6 +35,7 @@ Artifacts:
 - `reports/qgan_fashion/` – latest class grid, loss curves, LPIPS histogram, feature coverage plot, `metrics.json` (FID, LPIPS novelty, feature coverage).
 - `reports/qgan_fashion/loss_history.pkl` – pickled `{"generator": [...], "discriminator": [...]}` arrays updated every reporting pass.
 - `reports/qgan_fashion/epochs/epoch_XXXX/` – frozen snapshots of each epoch’s `loss_curve.png`, `metrics.json`, `lpips_hist.png`, and `feature_coverage.png` so you can audit training progress step-by-step.
+- Metrics now also log `colorfulness.mean|min|max` and the training curves include a `color_std` trace so you can spot grayscale collapse quickly.
 
 ### 4. Generate Inspiration Textures on Demand
 
@@ -58,8 +59,14 @@ During `trainer.fit()` the following are computed automatically every `report_ev
 - **FID** (torchmetrics) – realism vs. training distribution.
 - **LPIPS-to-nearest-train** – novelty; the histogram shows how far generations drift from their closest reference texture.
 - **Feature-space coverage** – EfficientNet feature radii vs. generator reach, plotted with coverage percentage.
+- **Colorfulness stats** – mean/min/max per-sample channel std from generated batches to ensure the model doesn’t drift to grayscale.
 
 All plots live inside `reports/qgan_fashion/`, with time-stamped copies in `reports/qgan_fashion/epochs/*`. Adjust `training.report_every` in `configs/qgan.yaml` if you want to thin out expensive metric passes.
+
+### 6. Training Stability Tips
+
+- Use `training.lr_generator` and `training.lr_discriminator` to decouple optimizers; the default slows the discriminator slightly.
+- `training.novelty_lambda` controls the diversity regularizer, while `training.color_penalty_weight`/`color_min_std` enforce a minimum per-sample channel variance to fight grayscale collapse. Set the weight to `0.0` to disable the penalty.
 
 ### 6. Notes on Quantum Creativity
 

@@ -1,0 +1,125 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quantum Texture Generator - Dashboard</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/dashboard.css') }}">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <h2 class="logo">Quantum Canvas</h2>
+            </div>
+            <div class="nav-actions">
+                <button class="btn-canvas" onclick="window.location.href='/canvas'" style="padding: 0.6rem 1.5rem; background: var(--glass-bg); border: 1px solid var(--glass-border); border-radius: 50px; color: var(--text-primary); cursor: pointer; transition: all 0.3s ease; font-weight: 500; margin-right: 1rem;">
+                    Canvas
+                </button>
+                <span class="user-name">{{ user.name }}</span>
+                <button class="btn-signout" onclick="signOut()">Sign Out</button>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <div class="dashboard-container">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-section">
+                <h3>Texture Classes</h3>
+                <div id="texture-classes" class="texture-list">
+                    <div class="loading">Loading classes...</div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Panel -->
+        <main class="main-panel">
+            <!-- Generation Controls -->
+            <section class="generation-controls">
+                <h1 class="page-title">Generate Quantum Textures</h1>
+                
+                <div class="control-group">
+                    <label for="texture-select">Texture Type</label>
+                    <select id="texture-select" class="select-input">
+                        <option value="">Select a texture class...</option>
+                    </select>
+                </div>
+
+                <div class="control-group">
+                    <label for="num-samples">Number of Samples: <span id="sample-count">6</span></label>
+                    <input type="range" id="num-samples" min="1" max="12" value="6" class="slider">
+                </div>
+
+                <button id="generate-btn" class="btn-generate" disabled>
+                    <span class="btn-text">Generate Textures</span>
+                    <span class="btn-loading" style="display: none;">
+                        <span class="spinner"></span> Generating...
+                    </span>
+                </button>
+            </section>
+
+            <!-- Results Display -->
+            <section class="results-section" id="results-section" style="display: none;">
+                <h2>Generated Textures</h2>
+                
+                <div class="results-grid">
+                    <!-- Generated Image -->
+                    <div class="result-card">
+                        <h3>Texture Grid</h3>
+                        <div class="image-container">
+                            <img id="generated-image" src="" alt="Generated textures">
+                        </div>
+                        <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
+                            <button class="btn-download" onclick="downloadImage()" style="flex: 1;">Download Image</button>
+                            <button class="btn-download" onclick="moveToCanvas()" style="flex: 1; background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); color: var(--dark-bg); border-color: transparent;">Move to Canvas</button>
+                        </div>
+                    </div>
+
+                    <!-- Color Palette -->
+                    <div class="result-card">
+                        <h3>Color Palette</h3>
+                        <div id="color-palette" class="color-palette">
+                            <!-- Colors will be populated here -->
+                        </div>
+                    </div>
+
+                    <!-- Concept Words -->
+                    <div class="result-card">
+                        <h3>Concept Keywords</h3>
+                        <div id="concept-words" class="concept-words">
+                            <!-- Concepts will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Canvas Projects -->
+            <section class="projects-section">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                    <h2>Canvas Projects</h2>
+                    <button class="btn-new-project" onclick="createNewCanvas()" style="padding: 0.6rem 1.5rem; background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); border: none; border-radius: 50px; color: var(--dark-bg); cursor: pointer; font-weight: 600; transition: all 0.3s ease;">
+                        + New Canvas
+                    </button>
+                </div>
+                <div id="projects-grid" class="projects-grid">
+                    <div class="loading">Loading projects...</div>
+                </div>
+            </section>
+
+            <!-- Generation History -->
+            <section class="history-section">
+                <h2>Recent Generations</h2>
+                <div id="history-list" class="history-list">
+                    <div class="loading">Loading history...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+</body>
+</html>

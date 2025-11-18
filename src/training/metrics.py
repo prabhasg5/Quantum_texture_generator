@@ -34,12 +34,14 @@ def compute_fid(
     batch_size: int,
     sample_count: int,
 ) -> float:
-    fid = FrechetInceptionDistance(feature=2048).to(device)
+    fid_device = torch.device("cpu") if device.type == "mps" else device
+    fid = FrechetInceptionDistance(feature=2048).to(fid_device)
     real_loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
     processed = 0
     for batch in real_loader:
-        imgs = denormalize(batch["image"].to(device))
+        imgs = denormalize(batch["image"].to(fid_device))
+        imgs = (imgs * 255).clamp(0, 255).to(torch.uint8)
         fid.update(imgs, real=True)
         processed += imgs.shape[0]
         if processed >= sample_count:
@@ -55,7 +57,8 @@ def compute_fid(
             cur = min(batch_size, remaining)
             classes = class_ids[idx : idx + cur]
             noise = torch.randn(cur, latent_dim, device=device)
-            fake = denormalize(generator(noise, classes))
+            fake = denormalize(generator(noise, classes)).to(fid_device)
+            fake = (fake * 255).clamp(0, 255).to(torch.uint8)
             fid.update(fake, real=False)
             remaining -= cur
             idx += cur
@@ -161,6 +164,33 @@ def compute_feature_coverage(
     nearest = real_fake.min(axis=1)
     coverage = float(np.mean(nearest <= kth))
     return coverage, kth.tolist(), nearest.tolist()
+
+
+def compute_colorfulness(
+    generator,
+    num_classes: int,
+    device: torch.device,
+    latent_dim: int,
+    sample_count: int = 128,
+) -> Dict[str, float]:
+    generator.eval()
+    stats = []
+    with torch.no_grad():
+        remaining = sample_count
+        while remaining > 0:
+            cur = min(32, remaining)
+            class_ids = torch.randint(0, num_classes, (cur,), device=device)
+            noise = torch.randn(cur, latent_dim, device=device)
+            imgs = denormalize(generator(noise, class_ids))
+            color_std = imgs.view(cur, imgs.shape[1], -1).std(dim=2).mean(dim=1)
+            stats.append(color_std.cpu())
+            remaining -= cur
+    values = torch.cat(stats)
+    return {
+        "mean": float(values.mean()),
+        "min": float(values.min()),
+        "max": float(values.max()),
+    }
 
 
 def save_metrics(metrics: Dict, out_path: Path) -> None:
