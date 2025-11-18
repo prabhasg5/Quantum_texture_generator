@@ -237,11 +237,13 @@ function createCanvasItem(type, data) {
     } else if (type === 'generation') {
         div.style.width = '400px';
         
-        // Image
-        const img = document.createElement('img');
-        img.className = 'generation-image';
-        img.src = data.image;
-        div.appendChild(img);
+        // Image - only add if valid
+        if (data.image && (data.image.startsWith('data:') || data.image.startsWith('http'))) {
+            const img = document.createElement('img');
+            img.className = 'generation-image';
+            img.src = data.image;
+            div.appendChild(img);
+        }
         
         // Info container
         const info = document.createElement('div');
@@ -529,15 +531,11 @@ function saveCanvas() {
         currentProjectName = projectName;
     }
     
-    // Generate thumbnail using html2canvas
-    generateCanvasThumbnail().then(thumbnail => {
-        // Save to API
-        saveToAPI(projectName, canvasData, thumbnail);
-    }).catch(error => {
-        console.error('Error generating thumbnail:', error);
-        // Save without thumbnail if generation fails
-        saveToAPI(projectName, canvasData, null);
-    });
+    // Generate thumbnail
+    const thumbnail = generateCanvasThumbnail();
+    
+    // Save to API
+    saveToAPI(projectName, canvasData, thumbnail);
 }
 
 async function saveToAPI(name, canvasData, thumbnail) {
@@ -572,68 +570,44 @@ async function saveToAPI(name, canvasData, thumbnail) {
     }
 }
 
-async function generateCanvasThumbnail() {
-    // Use html2canvas to capture the canvas as a thumbnail
-    try {
-        const canvasContainer = document.querySelector('.canvas-container');
-        
-        // Temporarily hide UI elements
-        const sidebar = document.getElementById('sidebar');
-        const toolbar = document.querySelector('.toolbar');
-        const wasSidebarVisible = sidebar && !sidebar.classList.contains('collapsed');
-        
-        if (sidebar) sidebar.style.display = 'none';
-        if (toolbar) toolbar.style.display = 'none';
-        
-        // Capture at smaller scale for thumbnail
-        const canvas = await html2canvas(canvasContainer, {
-            backgroundColor: '#0a0a0f',
-            scale: 0.5, // Smaller scale for thumbnail
-            logging: false,
-            useCORS: true,
-            width: 800,
-            height: 600
-        });
-        
-        // Restore UI
-        if (sidebar) sidebar.style.display = '';
-        if (toolbar) toolbar.style.display = '';
-        if (wasSidebarVisible && sidebar) {
-            sidebar.classList.remove('collapsed');
+function generateCanvasThumbnail() {
+    // Try to get the first valid image from canvas as thumbnail
+    const images = document.querySelectorAll('.canvas-item img');
+    for (const img of images) {
+        // Check if src is valid (not undefined, not empty, starts with data: or http)
+        if (img.src && 
+            img.src !== window.location.href + '/undefined' && 
+            !img.src.endsWith('/undefined') &&
+            (img.src.startsWith('data:') || img.src.startsWith('http'))) {
+            return img.src;
         }
-        
-        // Convert to data URL with compression
-        return canvas.toDataURL('image/jpeg', 0.7);
-    } catch (error) {
-        console.error('Error generating thumbnail with html2canvas:', error);
-        
-        // Fallback: try to use first image or create placeholder
-        const firstImage = document.querySelector('.canvas-item img');
-        if (firstImage && firstImage.src) {
-            return firstImage.src;
-        }
-        
-        // Last resort: create a simple placeholder
-        const fallbackCanvas = document.createElement('canvas');
-        fallbackCanvas.width = 400;
-        fallbackCanvas.height = 300;
-        const ctx = fallbackCanvas.getContext('2d');
-        
-        // Gradient background
-        const gradient = ctx.createLinearGradient(0, 0, 400, 300);
-        gradient.addColorStop(0, 'rgba(0, 245, 255, 0.2)');
-        gradient.addColorStop(1, 'rgba(255, 0, 255, 0.2)');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 400, 300);
-        
-        // Add text
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '24px sans-serif';
-        ctx.textAlign = 'center';
-        ctx.fillText(currentProjectName || 'Canvas', 200, 150);
-        
-        return fallbackCanvas.toDataURL('image/png');
     }
+    
+    // If no valid images, create a simple placeholder with canvas info
+    const canvasElement = document.createElement('canvas');
+    canvasElement.width = 400;
+    canvasElement.height = 300;
+    const ctx = canvasElement.getContext('2d');
+    
+    // Gradient background
+    const gradient = ctx.createLinearGradient(0, 0, 400, 300);
+    gradient.addColorStop(0, 'rgba(0, 245, 255, 0.2)');
+    gradient.addColorStop(1, 'rgba(255, 0, 255, 0.2)');
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 400, 300);
+    
+    // Draw items count
+    const itemCount = document.querySelectorAll('.canvas-item').length;
+    ctx.fillStyle = '#ffffff';
+    ctx.font = 'bold 32px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(currentProjectName || 'Canvas', 200, 130);
+    
+    ctx.font = '20px sans-serif';
+    ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+    ctx.fillText(`${itemCount} items`, 200, 170);
+    
+    return canvasElement.toDataURL('image/png');
 }
 
 async function loadProject(projectId) {

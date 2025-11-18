@@ -88,7 +88,8 @@ class Generation(db.Model):
     __tablename__ = 'generations'
     
     id = db.Column(db.Integer, primary_key=True)
-    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    project_id = db.Column(db.Integer, db.ForeignKey('projects.id'), nullable=True)  # Optional
     texture_class = db.Column(db.String(50))
     num_samples = db.Column(db.Integer, default=6)
     image_data = db.Column(db.Text)  # Store base64 image data
@@ -104,7 +105,7 @@ class Generation(db.Model):
             'image_data': self.image_data,
             'file_path': self.file_path,
             'created_at': self.created_at.isoformat(),
-            'metadata': self.generation_metadata
+            'generation_metadata': self.generation_metadata
         }
 
 
@@ -270,19 +271,10 @@ def generate_texture():
         # Save generation to database
         user = User.query.get(session['user_id'])
         
-        # Create or get default project
-        project = Project.query.filter_by(user_id=user.id, name='Default').first()
-        if not project:
-            project = Project(
-                user_id=user.id,
-                name='Default',
-                description='Default project for generated textures'
-            )
-            db.session.add(project)
-            db.session.flush()
-        
+        # Create generation without project (independent)
         generation = Generation(
-            project_id=project.id,
+            user_id=user.id,
+            project_id=None,  # Not associated with any project initially
             texture_class=texture_class,
             num_samples=num_samples,
             image_data=f'data:image/png;base64,{img_str}',  # Store the full base64 image
@@ -317,20 +309,16 @@ def get_generation_history():
     
     try:
         user = User.query.get(session['user_id'])
-        projects = Project.query.filter_by(user_id=user.id).all()
         
-        generations = []
-        for project in projects:
-            for gen in project.generations:
-                generations.append({
-                    **gen.to_dict(),
-                    'project_name': project.name
-                })
+        # Get all generations for the user, sorted by most recent
+        generations = Generation.query.filter_by(user_id=user.id)\
+            .order_by(Generation.created_at.desc())\
+            .limit(50)\
+            .all()
         
-        # Sort by created_at descending
-        generations.sort(key=lambda x: x['created_at'], reverse=True)
-        
-        return jsonify({'generations': generations[:50]}), 200  # Limit to 50 recent
+        return jsonify({
+            'generations': [gen.to_dict() for gen in generations]
+        }), 200
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
