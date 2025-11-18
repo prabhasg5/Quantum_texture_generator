@@ -20,7 +20,7 @@
             <div class="nav-links">
                 <a href="#features">Features</a>
                 <a href="#how-it-works">How It Works</a>
-                <a href="#pricing">Pricing</a>
+                <a href="#about">About Us</a>
                 <button class="btn-signin" id="openSignIn">Sign In</button>
             </div>
         </div>
@@ -43,21 +43,6 @@
                     <span>Get Started</span>
                     <div class="btn-glow"></div>
                 </button>
-                <button class="btn-secondary">Watch Demo</button>
-            </div>
-            <div class="hero-stats">
-                <div class="stat">
-                    <div class="stat-number">10K+</div>
-                    <div class="stat-label">Textures Generated</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">500+</div>
-                    <div class="stat-label">Fashion Designers</div>
-                </div>
-                <div class="stat">
-                    <div class="stat-number">∞</div>
-                    <div class="stat-label">Creative Possibilities</div>
-                </div>
             </div>
         </div>
         <div class="scroll-indicator">
@@ -208,6 +193,152 @@
         </div>
     </section>
 
+    <!-- About Us -->
+    <section class="about-section" id="about">
+        <div class="section-header">
+            <h2 class="section-title">About Quantum Canvas</h2>
+            <p class="section-subtitle">An EPICS Project - Leveraging Quantum Computing for Creative Innovation</p>
+        </div>
+        
+        <div class="about-content">
+            <div class="about-story">
+                <h3>Our Story</h3>
+                <p class="about-text">
+                    Quantum Canvas was born from a critical insight during our 5th semester EPICS (Engineering Projects in Community Service) project. 
+                    Our mission: explore how quantum computing can solve real-world creative challenges in the fashion industry.
+                </p>
+                
+                <div class="fieldwork-section">
+                    <div class="fieldwork-images">
+                        <!-- ADD YOUR FIELDWORK PHOTOS HERE -->
+                        <div class="fieldwork-image">
+                            <img src="{{ url_for('static', filename='images/fieldwork1.jpg') }}" 
+                                 alt="Fieldwork at Fashion Design College - Photo 1" 
+                                 class="fieldwork-photo">
+                            <div class="fieldwork-caption">Visiting the fashion design college</div>
+                        </div>
+                        <div class="fieldwork-image">
+                            <img src="{{ url_for('static', filename='images/fieldwork2.jpg') }}" 
+                                 alt="Fieldwork at Fashion Design College - Photo 2" 
+                                 class="fieldwork-photo">
+                            <div class="fieldwork-caption">Interviewing students and faculty</div>
+                        </div>
+                    </div>
+                    
+                    <div class="fieldwork-text">
+                        <h4>The Fieldwork That Changed Everything</h4>
+                        <p>
+                            We conducted fieldwork at a fashion design college, interviewing students and faculty to understand their creative workflow. 
+                            What we discovered was eye-opening: the biggest bottlenecks in their design process were:
+                        </p>
+                        <ul class="bottleneck-list">
+                            <li><strong>Finding Inspiration:</strong> Designers spend countless hours searching for unique patterns and textures, often hitting creative blocks.</li>
+                            <li><strong>Pattern Making:</strong> Creating original, never-before-seen patterns is time-consuming and technically challenging.</li>
+                            <li><strong>Iteration Speed:</strong> Traditional methods make rapid experimentation impractical.</li>
+                        </ul>
+                        <p>
+                            These pain points became the foundation of Quantum Canvas. We realized that quantum computing's ability to explore 
+                            vast solution spaces could generate novel patterns that inspire designers while dramatically accelerating their workflow.
+                        </p>
+                    </div>
+                </div>
+
+                <div class="quantum-advantage">
+                    <h4>Why Quantum?</h4>
+                    <p>
+                        Our project leverages <strong>Quantum Generative Adversarial Networks (QGANs)</strong> to harness quantum superposition and entanglement. 
+                        This allows the system to explore exponentially larger pattern spaces than classical methods, generating truly unique textures that 
+                        push creative boundaries while remaining controllable and production-ready.
+                    </p>
+                </div>
+
+                <div class="project-goals">
+                    <h4>Our EPICS Mission</h4>
+                    <p>
+                        Through this project, we aim to:
+                    </p>
+                    <ul class="mission-list">
+                        <li>Bridge quantum computing research with practical creative applications</li>
+                        <li>Empower fashion designers with AI-powered tools that enhance, not replace, human creativity</li>
+                        <li>Demonstrate quantum advantage in generative design tasks</li>
+                        <li>Create accessible technology that addresses real community needs</li>
+                    </ul>
+                </div>
+
+                <div class="team-section">
+                    <h4>Meet The Team</h4>
+                    <p class="team-intro">Third-year Information Technology students passionate about quantum computing and creative AI</p>
+                    
+                    <div class="team-grid">
+                        <!-- Team Member 1: Prabhas Mekala -->
+                        <div class="team-card">
+                            <div class="team-photo">
+                                <img src="{{ url_for('static', filename='images/prabhas.jpg') }}" 
+                                     alt="Prabhas Mekala" 
+                                     class="member-photo">
+                            </div>
+                            <div class="team-info">
+                                <h5 class="member-name">Prabhas Mekala</h5>
+                                <p class="member-program">3rd Year IT</p>
+                                <p class="member-roll">Roll No: 238W1A12G5</p>
+                                <div class="member-quote">
+                                    <span class="quote-icon">"</span>
+                                    <p>I'm here to learn, build, make an impact</p>
+                                    <span class="quote-icon">"</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Team Member 2: Rishi Kaushal -->
+                        <div class="team-card">
+                            <div class="team-photo">
+                                <img src="{{ url_for('static', filename='images/rishi.jpg') }}" 
+                                     alt="Rishi Kaushal" 
+                                     class="member-photo">
+                            </div>
+                            <div class="team-info">
+                                <h5 class="member-name">Rishi Kaushal</h5>
+                                <p class="member-program">3rd Year IT</p>
+                                <p class="member-roll">Roll No: 238W1A12F2</p>
+                                <div class="member-quote">
+                                    <span class="quote-icon">"</span>
+                                    <p>Turning quantum possibilities into creative realities</p>
+                                    <span class="quote-icon">"</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Team Member 3: Shaik Ali Murtuza -->
+                        <div class="team-card">
+                            <div class="team-photo">
+                                <img src="{{ url_for('static', filename='images/ali.jpg') }}" 
+                                     alt="Shaik Ali Murtuza" 
+                                     class="member-photo">
+                            </div>
+                            <div class="team-info">
+                                <h5 class="member-name">Shaik Ali Murtuza</h5>
+                                <p class="member-program">3rd Year IT</p>
+                                <p class="member-roll">Roll No: 238W1A12H9</p>
+                                <div class="member-quote">
+                                    <span class="quote-icon">"</span>
+                                    <p>Bridging quantum innovation with human creativity</p>
+                                    <span class="quote-icon">"</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="team-footer">
+                    <p class="project-credit">
+                        <strong>A 5th Semester EPICS Project</strong><br>
+                        Exploring quantum computing applications for creative industries
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
     <!-- CTA Section -->
     <section class="cta-section">
         <div class="cta-content">
@@ -234,13 +365,13 @@
                 <div class="footer-column">
                     <h4>Product</h4>
                     <a href="#features">Features</a>
-                    <a href="#pricing">Pricing</a>
+                    <a href="#how-it-works">How It Works</a>
                     <a href="#">Documentation</a>
                     <a href="#">API</a>
                 </div>
                 <div class="footer-column">
                     <h4>Company</h4>
-                    <a href="#">About</a>
+                    <a href="#about">About Us</a>
                     <a href="#">Blog</a>
                     <a href="#">Careers</a>
                     <a href="#">Contact</a>
