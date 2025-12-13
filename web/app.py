@@ -5,13 +5,20 @@ from datetime import datetime, timedelta
 import os
 import secrets
 import io
+from io import BytesIO 
 import base64
 from pathlib import Path
 
 # Import texture generator utilities
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
-from web.generation_utils import TextureGenerator
+
+try:
+    from web.generation_utils import TextureGenerator, GeminiRenderer, PollinationsRenderer, TextureAnalyzer
+except ImportError as e:
+    print(f"Warning: Could not import generation utilities: {e}")
+    TextureGenerator = None
+    GeminiRenderer = None
 
 app = Flask(__name__)
 
@@ -22,6 +29,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 app.config['PERMANENT_SESSION_LIFETIME'] = timedelta(days=7)
 
 db = SQLAlchemy(app)
+
 
 # ===== DATABASE MODELS =====
 class User(db.Model):
@@ -240,6 +248,40 @@ def get_texture_classes():
         return jsonify({'error': str(e)}), 500
 
 
+@app.route('/api/garment-options')
+def garment_options():
+    """List selectable garment types for the dashboard"""
+    garments = [
+        {"id": "tshirt", "label": "T-Shirt"},
+        {"id": "shirt", "label": "Shirt"},
+        {"id": "pants", "label": "Pants"},
+        {"id": "saree", "label": "Saree"},
+        {"id": "dress", "label": "Dress"},
+        {"id": "skirt", "label": "Skirt"},
+        {"id": "scarf", "label": "Scarf"},
+        {"id": "jacket", "label": "Jacket"}
+    ]
+    return jsonify({'garments': garments}), 200
+
+
+@app.route('/api/color-options')
+def color_options():
+    """List selectable colors for the dashboard"""
+    colors = [
+        {"id": "red", "hex": "#e74c3c", "label": "Red"},
+        {"id": "blue", "hex": "#3498db", "label": "Blue"},
+        {"id": "green", "hex": "#2ecc71", "label": "Green"},
+        {"id": "black", "hex": "#111111", "label": "Black"},
+        {"id": "white", "hex": "#f5f5f5", "label": "White"},
+        {"id": "beige", "hex": "#d5c4a1", "label": "Beige"},
+        {"id": "yellow", "hex": "#f1c40f", "label": "Yellow"},
+        {"id": "purple", "hex": "#8e44ad", "label": "Purple"},
+        {"id": "orange", "hex": "#e67e22", "label": "Orange"},
+        {"id": "pink", "hex": "#ff6ad5", "label": "Pink"}
+    ]
+    return jsonify({'colors': colors}), 200
+
+
 @app.route('/api/generate', methods=['POST'])
 def generate_texture():
     """Generate textures with color palette and concepts"""
@@ -250,6 +292,8 @@ def generate_texture():
         data = request.get_json()
         texture_class = data.get('texture_class')
         num_samples = data.get('num_samples', 6)
+        garment = (data.get('garment') or '').strip()
+        color = (data.get('color') or '').strip()
         
         if not texture_class:
             return jsonify({'error': 'Texture class required'}), 400
@@ -259,9 +303,15 @@ def generate_texture():
         
         # Generate textures
         generator = get_texture_generator()
-        grid_image, color_palette, concept_words = generator.generate_textures(
-            texture_class, num_samples
-        )
+        # If generator supports garment/color, pass them; otherwise ignore gracefully
+        try:
+            grid_image, color_palette, concept_words = generator.generate_textures(
+                texture_class, num_samples, garment=garment or None, color=color or None
+            )
+        except TypeError:
+            grid_image, color_palette, concept_words = generator.generate_textures(
+                texture_class, num_samples
+            )
         
         # Convert image to base64
         buffered = io.BytesIO()
@@ -280,7 +330,9 @@ def generate_texture():
             image_data=f'data:image/png;base64,{img_str}',  # Store the full base64 image
             generation_metadata={
                 'color_palette': color_palette,
-                'concept_words': concept_words
+                'concept_words': concept_words,
+                'garment': garment or None,
+                'color': color or None
             }
         )
         db.session.add(generation)
@@ -299,6 +351,61 @@ def generate_texture():
     except Exception as e:
         db.session.rollback()
         return jsonify({'error': f'Generation failed: {str(e)}'}), 500
+
+
+@app.route('/api/render-garment', methods=['POST'])
+def render_garment():
+    """Render a garment image using Pollinations.ai (free, no API key needed).
+    
+    First analyzes the texture image using Gemini vision to get an accurate
+    description, then uses that description to generate the garment image.
+    """
+    if 'user_id' not in session:
+        return jsonify({'error': 'Not authenticated'}), 401
+
+    try:
+        data = request.get_json()
+        garment = (data.get('garment') or '').strip()
+        color = (data.get('color') or '').strip()
+        texture_data_url = data.get('texture_image')  # expected 'data:image/png;base64,...'
+        texture_class = (data.get('texture_class') or '').strip()
+        color_palette = data.get('color_palette') or []
+        concept_words = data.get('concept_words') or []
+
+        if not garment or not color:
+            return jsonify({'error': 'garment and color are required'}), 400
+
+        # Step 1: Analyze the texture image using Gemini vision
+        texture_description = None
+        if texture_data_url:
+            try:
+                analyzer = TextureAnalyzer()
+                texture_description = analyzer.analyze(texture_data_url)
+                print(f"[TextureAnalyzer] Analyzed texture: {texture_description}")
+            except Exception as e:
+                print(f"[TextureAnalyzer] Warning: Could not analyze texture: {e}")
+                # Continue without texture description - will fall back to texture_class
+
+        # Step 2: Use Pollinations.ai to generate the garment
+        renderer = PollinationsRenderer()
+        base64_png = renderer.render(
+            texture_base64_png=texture_data_url,
+            garment=garment,
+            color_hex_or_name=color,
+            texture_class=texture_class,
+            color_palette=color_palette,
+            concept_words=concept_words,
+            texture_description=texture_description  # Pass the analyzed description
+        )
+        data_url = f'data:image/png;base64,{base64_png}'
+
+        return jsonify({
+            'success': True, 
+            'image': data_url,
+            'texture_analysis': texture_description  # Return analysis for transparency
+        }), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/api/generations/history')
@@ -524,6 +631,25 @@ def get_profile():
         return jsonify({'error': 'User not found'}), 404
     
     return jsonify(user.to_dict()), 200
+
+
+@app.route('/api/gemini/models')
+def list_gemini_models():
+    """Return available Gemini models and their supported methods."""
+    try:
+        import google.generativeai as genai
+        genai.configure(api_key=os.environ.get('GEMINI_API_KEY'))
+        models = genai.list_models()
+        items = []
+        for m in models:
+            items.append({
+                'name': getattr(m, 'name', ''),
+                'display_name': getattr(m, 'display_name', ''),
+                'methods': getattr(m, 'supported_generation_methods', []),
+            })
+        return jsonify({'models': items}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
 
 
 # ===== DATABASE INITIALIZATION =====

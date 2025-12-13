@@ -5,6 +5,8 @@ let generatedImageData = null;
 // Initialize dashboard
 document.addEventListener('DOMContentLoaded', () => {
     loadTextureClasses();
+    loadGarmentOptions();
+    loadColorOptions();
     loadCanvasProjects();
     loadGenerationHistory();
     setupEventListeners();
@@ -15,6 +17,8 @@ function setupEventListeners() {
     const numSamples = document.getElementById('num-samples');
     const sampleCount = document.getElementById('sample-count');
     const generateBtn = document.getElementById('generate-btn');
+    const garmentSelect = document.getElementById('garment-select');
+    const colorSelect = document.getElementById('color-select');
 
     // Update sample count display
     numSamples.addEventListener('input', (e) => {
@@ -24,7 +28,15 @@ function setupEventListeners() {
     // Enable generate button when texture is selected
     textureSelect.addEventListener('change', (e) => {
         currentTextureClass = e.target.value;
-        generateBtn.disabled = !currentTextureClass;
+        const ready = !!currentTextureClass;
+        generateBtn.disabled = !ready;
+    });
+
+    garmentSelect.addEventListener('change', () => {
+        // no-op; selection read on generate
+    });
+    colorSelect.addEventListener('change', () => {
+        // no-op; selection read on generate
     });
 
     // Generate button click
@@ -84,6 +96,8 @@ function selectTextureFromSidebar(className, element) {
 
 async function generateTextures() {
     const numSamples = parseInt(document.getElementById('num-samples').value);
+    const garment = (document.getElementById('garment-select').value || '').trim();
+    const color = (document.getElementById('color-select').value || '').trim();
     const generateBtn = document.getElementById('generate-btn');
     const btnText = generateBtn.querySelector('.btn-text');
     const btnLoading = generateBtn.querySelector('.btn-loading');
@@ -101,7 +115,9 @@ async function generateTextures() {
             },
             body: JSON.stringify({
                 texture_class: currentTextureClass,
-                num_samples: numSamples
+                num_samples: numSamples,
+                garment,
+                color
             })
         });
 
@@ -124,6 +140,39 @@ async function generateTextures() {
     }
 }
 
+async function loadGarmentOptions() {
+    try {
+        const res = await fetch('/api/garment-options');
+        const data = await res.json();
+        if (!res.ok) return;
+        const sel = document.getElementById('garment-select');
+        sel.innerHTML = '<option value="">Select garment...</option>';
+        data.garments.forEach(g => {
+            const opt = document.createElement('option');
+            opt.value = g.id;
+            opt.textContent = g.label;
+            sel.appendChild(opt);
+        });
+    } catch (e) { console.error('Failed to load garments', e); }
+}
+
+async function loadColorOptions() {
+    try {
+        const res = await fetch('/api/color-options');
+        const data = await res.json();
+        if (!res.ok) return;
+        const sel = document.getElementById('color-select');
+        sel.innerHTML = '<option value="">Select color...</option>';
+        data.colors.forEach(c => {
+            const opt = document.createElement('option');
+            opt.value = c.label;  // Use color NAME (e.g., "Red") not hex - works better in AI prompts
+            opt.textContent = `${c.label}`;
+            opt.style.backgroundColor = c.hex;
+            sel.appendChild(opt);
+        });
+    } catch (e) { console.error('Failed to load colors', e); }
+}
+
 function displayResults(data) {
     const resultsSection = document.getElementById('results-section');
     const generatedImage = document.getElementById('generated-image');
@@ -138,6 +187,9 @@ function displayResults(data) {
 
     // Display generated image
     generatedImage.src = data.image;
+
+    // Add garment render action
+    addGarmentRenderControls();
 
     // Display color palette
     colorPalette.innerHTML = '';
@@ -168,6 +220,94 @@ function displayResults(data) {
 
     // Smooth scroll to results
     resultsSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function addGarmentRenderControls() {
+    const container = document.querySelector('.results-section .result-card .image-container');
+    if (!container) return;
+    let btn = document.getElementById('render-garment-btn');
+    if (!btn) {
+        btn = document.createElement('button');
+        btn.id = 'render-garment-btn';
+        btn.className = 'btn-download';
+        btn.style.marginTop = '0.75rem';
+        btn.textContent = 'Render Garment with Texture';
+        btn.onclick = renderGarmentWithTexture;
+        container.parentElement.appendChild(btn);
+    }
+}
+
+async function renderGarmentWithTexture() {
+    if (!generatedImageData) {
+        alert('Generate a texture first.');
+        return;
+    }
+    const garment = (document.getElementById('garment-select').value || '').trim();
+    const color = (document.getElementById('color-select').value || '').trim();
+    if (!garment || !color) {
+        alert('Select a garment and color.');
+        return;
+    }
+    const textureImage = generatedImageData.image; // data URL from generation
+    const colorPalette = generatedImageData.color_palette || [];
+    const conceptWords = generatedImageData.concept_words || [];
+
+    const btn = document.getElementById('render-garment-btn');
+    btn.disabled = true;
+    btn.textContent = 'Analyzing texture...';
+
+    try {
+        // Show progress message
+        setTimeout(() => {
+            if (btn.textContent === 'Analyzing texture...') {
+                btn.textContent = 'Generating garment...';
+            }
+        }, 3000);
+
+        const res = await fetch('/api/render-garment', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                garment,
+                color,
+                texture_image: textureImage,
+                texture_class: currentTextureClass,
+                color_palette: colorPalette,
+                concept_words: conceptWords
+            })
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || 'Render failed');
+        }
+        // Show rendered garment image in a new card with texture analysis
+        const resultsGrid = document.querySelector('.results-grid');
+        const card = document.createElement('div');
+        card.className = 'result-card';
+        
+        // Build the texture analysis display
+        const analysisHtml = data.texture_analysis 
+            ? `<p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem; font-style:italic;">"${data.texture_analysis}"</p>`
+            : '';
+        
+        card.innerHTML = `
+            <h3>Rendered ${garment}</h3>
+            <div class="image-container">
+                <img src="${data.image}" alt="Rendered garment">
+            </div>
+            ${analysisHtml}
+            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
+                <button class="btn-download" onclick="(function(){const a=document.createElement('a'); a.href='${data.image}'; a.download='garment-${Date.now()}.png'; a.click();})()">Download</button>
+                <button class="btn-download" onclick="(function(){sessionStorage.setItem('pendingCanvasItem', JSON.stringify({type:'garment', image:'${data.image}', textureClass: currentTextureClass})); window.location.href='/canvas';})()" style="background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); color: var(--dark-bg); border-color: transparent;">Move to Canvas</button>
+            </div>
+        `;
+        resultsGrid.appendChild(card);
+    } catch (e) {
+        alert(e.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Render Garment with Texture';
+    }
 }
 
 async function loadCanvasProjects() {

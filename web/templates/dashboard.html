@@ -49,6 +49,21 @@
                     </select>
                 </div>
 
+                <div class="control-group" style="display:flex; gap:1rem; align-items:flex-end; flex-wrap:wrap;">
+                    <div style="flex:1; min-width:220px;">
+                        <label for="garment-select">Garment</label>
+                        <select id="garment-select" class="select-input">
+                            <option value="">Select garment...</option>
+                        </select>
+                    </div>
+                    <div style="flex:1; min-width:220px;">
+                        <label for="color-select">Color</label>
+                        <select id="color-select" class="select-input">
+                            <option value="">Select color...</option>
+                        </select>
+                    </div>
+                </div>
+
                 <div class="control-group">
                     <label for="num-samples">Number of Samples: <span id="sample-count">6</span></label>
                     <input type="range" id="num-samples" min="1" max="12" value="6" class="slider">

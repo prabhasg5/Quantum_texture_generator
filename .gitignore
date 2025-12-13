@@ -26,3 +26,14 @@ logs/
 *.log
 .ipynb_checkpoints/
 
+# Environment variables and secrets
+.env
+*.env
+!.env.example
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+quantum_canvas.db
+
