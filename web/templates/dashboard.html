@@ -64,11 +64,6 @@
                     </div>
                 </div>
 
-                <div class="control-group">
-                    <label for="num-samples">Number of Samples: <span id="sample-count">6</span></label>
-                    <input type="range" id="num-samples" min="1" max="12" value="6" class="slider">
-                </div>
-
                 <button id="generate-btn" class="btn-generate" disabled>
                     <span class="btn-text">Generate Textures</span>
                     <span class="btn-loading" style="display: none;">
@@ -91,14 +86,6 @@
                         <div style="display: flex; gap: 0.5rem; margin-top: 1rem;">
                             <button class="btn-download" onclick="downloadImage()" style="flex: 1;">Download Image</button>
                             <button class="btn-download" onclick="moveToCanvas()" style="flex: 1; background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); color: var(--dark-bg); border-color: transparent;">Move to Canvas</button>
-                        </div>
-                    </div>
-
-                    <!-- Color Palette -->
-                    <div class="result-card">
-                        <h3>Color Palette</h3>
-                        <div id="color-palette" class="color-palette">
-                            <!-- Colors will be populated here -->
                         </div>
                     </div>
 

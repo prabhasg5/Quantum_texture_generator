@@ -14,16 +14,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
 function setupEventListeners() {
     const textureSelect = document.getElementById('texture-select');
-    const numSamples = document.getElementById('num-samples');
-    const sampleCount = document.getElementById('sample-count');
     const generateBtn = document.getElementById('generate-btn');
     const garmentSelect = document.getElementById('garment-select');
     const colorSelect = document.getElementById('color-select');
-
-    // Update sample count display
-    numSamples.addEventListener('input', (e) => {
-        sampleCount.textContent = e.target.value;
-    });
 
     // Enable generate button when texture is selected
     textureSelect.addEventListener('change', (e) => {
@@ -95,7 +88,7 @@ function selectTextureFromSidebar(className, element) {
 }
 
 async function generateTextures() {
-    const numSamples = parseInt(document.getElementById('num-samples').value);
+    const numSamples = 1; // Default to single texture
     const garment = (document.getElementById('garment-select').value || '').trim();
     const color = (document.getElementById('color-select').value || '').trim();
     const generateBtn = document.getElementById('generate-btn');
@@ -176,7 +169,6 @@ async function loadColorOptions() {
 function displayResults(data) {
     const resultsSection = document.getElementById('results-section');
     const generatedImage = document.getElementById('generated-image');
-    const colorPalette = document.getElementById('color-palette');
     const conceptWords = document.getElementById('concept-words');
 
     // Store full generation data for download and canvas transfer
@@ -190,23 +182,6 @@ function displayResults(data) {
 
     // Add garment render action
     addGarmentRenderControls();
-
-    // Display color palette
-    colorPalette.innerHTML = '';
-    data.color_palette.forEach(color => {
-        const swatch = document.createElement('div');
-        swatch.className = 'color-swatch';
-        swatch.style.backgroundColor = color;
-        swatch.title = color;
-        swatch.onclick = () => copyToClipboard(color);
-        
-        const hex = document.createElement('span');
-        hex.className = 'color-hex';
-        hex.textContent = color;
-        swatch.appendChild(hex);
-        
-        colorPalette.appendChild(swatch);
-    });
 
     // Display concept words
     conceptWords.innerHTML = '';
@@ -280,34 +255,64 @@ async function renderGarmentWithTexture() {
         if (!res.ok) {
             throw new Error(data.error || 'Render failed');
         }
-        // Show rendered garment image in a new card with texture analysis
-        const resultsGrid = document.querySelector('.results-grid');
-        const card = document.createElement('div');
-        card.className = 'result-card';
-        
-        // Build the texture analysis display
-        const analysisHtml = data.texture_analysis 
-            ? `<p style="font-size:0.85rem; color:var(--text-secondary); margin-top:0.5rem; font-style:italic;">"${data.texture_analysis}"</p>`
-            : '';
-        
-        card.innerHTML = `
-            <h3>Rendered ${garment}</h3>
-            <div class="image-container">
-                <img src="${data.image}" alt="Rendered garment">
-            </div>
-            ${analysisHtml}
-            <div style="display:flex; gap:0.5rem; margin-top:0.5rem;">
-                <button class="btn-download" onclick="(function(){const a=document.createElement('a'); a.href='${data.image}'; a.download='garment-${Date.now()}.png'; a.click();})()">Download</button>
-                <button class="btn-download" onclick="(function(){sessionStorage.setItem('pendingCanvasItem', JSON.stringify({type:'garment', image:'${data.image}', textureClass: currentTextureClass})); window.location.href='/canvas';})()" style="background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); color: var(--dark-bg); border-color: transparent;">Move to Canvas</button>
-            </div>
-        `;
-        resultsGrid.appendChild(card);
+        // Update the garment display (replace, don't add new cards)
+        updateGarmentDisplay(data, garment);
     } catch (e) {
         alert(e.message);
     } finally {
         btn.disabled = false;
         btn.textContent = 'Render Garment with Texture';
     }
+}
+
+// Store the last rendered garment data
+let renderedGarmentData = null;
+
+function updateGarmentDisplay(data, garmentType) {
+    renderedGarmentData = data;
+    
+    // Find or create the garment display section
+    let garmentSection = document.getElementById('garment-display-section');
+    if (!garmentSection) {
+        // Create a new section for garment display
+        const resultsGrid = document.querySelector('.results-grid');
+        garmentSection = document.createElement('div');
+        garmentSection.id = 'garment-display-section';
+        garmentSection.className = 'result-card';
+        resultsGrid.appendChild(garmentSection);
+    }
+    
+    // Update the content
+    garmentSection.innerHTML = `
+        <h3>Rendered ${garmentType}</h3>
+        <div class="image-container">
+            <img src="${data.image}" alt="Rendered ${garmentType}" style="max-width: 100%; border-radius: 8px;">
+        </div>
+        <div style="display:flex; gap:0.5rem; margin-top:0.5rem; flex-wrap: wrap;">
+            <button class="btn-download" id="download-garment-btn">Download</button>
+            <button class="btn-download" id="canvas-garment-btn" style="background: linear-gradient(135deg, var(--neon-cyan), var(--neon-magenta)); color: var(--dark-bg); border-color: transparent;">Move to Canvas</button>
+        </div>
+    `;
+    
+    // Attach event listeners
+    document.getElementById('download-garment-btn').onclick = function() {
+        const a = document.createElement('a');
+        a.href = data.image;
+        a.download = `garment-${Date.now()}.png`;
+        a.click();
+    };
+    
+    document.getElementById('canvas-garment-btn').onclick = function() {
+        sessionStorage.setItem('pendingCanvasItem', JSON.stringify({
+            type: 'garment',
+            image: data.image,
+            textureClass: currentTextureClass
+        }));
+        window.location.href = '/canvas';
+    };
+    
+    // Scroll to show the updated garment
+    garmentSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
 async function loadCanvasProjects() {
